@@ -14,13 +14,21 @@ export function makeTableService<T>(sync: (table?: Table<T>) => Promise<Table<T>
     // optional initialization code
     return {
         get(key: string): Promise<T> {
-            return Promise.reject('not implemented')
+            return sync().then((data) => (key in data)?data[key]:Promise.reject(MISSING_KEY)).catch(() => Promise.reject(MISSING_KEY))
         },
         set(key: string, val: T): Promise<void> {
-            return Promise.reject('not implemented')
+            return sync().then((data) => {
+                let l = (Object.assign({}, ...Object.keys(data).map((x) => ({[x]: data[x]}))))
+                l[key] = val
+                l as Table<T>
+                sync(l).then()
+            }).catch(() => Promise.reject(MISSING_KEY))
         },
         delete(key: string): Promise<void> {
-            return Promise.reject('not implemented')
+            return sync().then((data) => {
+                let t = Object.assign({}, ...Object.keys(data).map((x) => (x!=key?{[x]: data[key]}:{}))) as Table<T>
+                sync(t)
+            }).catch(() => Promise.reject(MISSING_KEY))
         }
     }
 }
