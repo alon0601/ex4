@@ -111,10 +111,11 @@ export const getParentsType = (te: TExp, p: Program): TExp[] =>
 
 // L51
 // Get the list of types that cover all ts in types.
-export const coverTypes = (types: TExp[], p: Program): TExp[] => 
+export const coverTypes = (types: TExp[], p: Program): TExp[] =>  {
     // [[p11, p12], [p21], [p31, p32]] --> types in intersection of all lists
-    ((parentsList: TExp[][]): TExp[] => reduce(intersection, first(parentsList), rest(parentsList)))
-     (map((t) => getParentsType(t,p), types));
+    const parentsList : TExp[][] = map((t) => getParentsType(t,p), types);
+    return reduce<TExp[], TExp[]>(intersection, first(parentsList), rest(parentsList));
+}
 
 // Return the most specific in a list of TExps
 // For example given UD(R1, R2):

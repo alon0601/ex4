@@ -175,14 +175,14 @@ describe('Assignment 4 Part 2', () => {
 
         test('observers get updates', async () => {
             const mockFn = jest.fn()
-            optService.subscribe(mockFn)
+            service.subscribe(mockFn)
 
             const bookC = {title: 'title_C', author: 'author_C'}
-            await optService.set('C', bookC)
+            await service.set('C', bookC)
             expect(mockFn).toHaveBeenCalledTimes(1)
             expect(mockFn).toHaveBeenNthCalledWith(1, {...templateBookTable, 'C': bookC})
             mockFn.mockReset()
-            await optService.delete('B')
+            await service.delete('B')
             expect(mockFn).toHaveBeenCalledTimes(1)
             expect(mockFn).toHaveBeenNthCalledWith(1, {'A': templateBookTable['A'], 'C': bookC})
         })
