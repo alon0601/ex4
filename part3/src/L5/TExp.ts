@@ -46,8 +46,9 @@ import { makeBox, setBox, unbox, Box } from '../shared/box';
 import { cons, first, rest } from '../shared/list';
 import { Result, bind, makeOk, makeFailure, mapResult, mapv } from "../shared/result";
 import { isCompoundSexp, isToken, parse as p } from "../shared/parser";
+import { SymbolSExp } from "./L5-value";
 
-export type TExp =  AtomicTExp | CompoundTExp | TVar | UserDefinedNameTExp; // L51
+export type TExp =  AtomicTExp | CompoundTExp | TVar | UserDefinedNameTExp | SymbolTExp |PairTExp; // L51
 export const isTExp = (x: any): x is TExp => isAtomicTExp(x) || isCompoundTExp(x) || isTVar(x) || isUserDefinedNameTExp(x); // L51
 
 export type AtomicTExp = NumTExp | BoolTExp | StrTExp | VoidTExp | UserDefinedNameTExp | AnyTExp; // L51
@@ -106,6 +107,17 @@ export const isStrTExp = (x: any): x is StrTExp => x.tag === "StrTExp";
 export type VoidTExp = { tag: "VoidTExp" };
 export const makeVoidTExp = (): VoidTExp => ({tag: "VoidTExp"});
 export const isVoidTExp = (x: any): x is VoidTExp => x.tag === "VoidTExp";
+
+//ex4
+
+export type SymbolTExp = { tag: "SymbolTExp", val?: SymbolSExp };
+export const makeSymbolTExp = (s?: SymbolSExp): SymbolTExp => ({tag: "SymbolTExp", val: s});
+export const isSymbolTExp = (x: any): x is SymbolTExp => x.tag === "SymbolTExp";
+
+// L51
+export type PairTExp = { tag: "PairTExp" };
+export const makePairTExp = (): PairTExp => ({tag: "PairTExp"});
+export const isPairTExp = (x: any): x is PairTExp => x.tag === "PairTExp";
 
 // proc-te(param-tes: list(te), return-te: te)
 export type ProcTExp = { tag: "ProcTExp"; paramTEs: TExp[]; returnTE: TExp; };
@@ -335,6 +347,8 @@ export const unparseTExp = (te: TExp): Result<string> => {
         isStrTExp(x) ? makeOk('string') :
         isVoidTExp(x) ? makeOk('void') :
         isAnyTExp(x) ? makeOk('any') :
+        isSymbolTExp(x) ? x.val ? makeOk(`symbol-${x.val.val}`) : makeOk('symbol') :
+        isPairTExp(x) ? makeOk('cons') : 
         isEmptyTVar(x) ? makeOk(x.var) :
         isUserDefinedNameTExp(x) ? makeOk(x.typeName) :
         isTVar(x) ? up(tvarContents(x)) :

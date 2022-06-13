@@ -112,30 +112,11 @@ export type ReactiveTableService<T> = {
 export async function makeReactiveTableService<T>(sync: (table?: Table<T>) => Promise<Table<T>>, optimistic: boolean): Promise<ReactiveTableService<T>> {
     // optional initialization code
 
-    let _table: Table<T> = await sync().catch()
+    let _table: Table<T> = await sync().catch(()=>Promise.reject("fuck"))
     let sub:((table: Table<T>) => void)[] = []
     
     const handleMutation = async (newTable: Table<T>) => {
-        if (!optimistic){
-            try{
-            _table = await sync(newTable)
-            sub.map((f)=>f(_table))
-            }
-            catch{
-                sub.map((f)=>f(_table))
-            }
-        }
-        else{
-            sub.map((f)=>f(newTable))
-            try{
-            _table = await sync(newTable)
-            }
-            catch{
-                sub.map((f)=>f(_table))  
-            }
-        }
-
-
+        sub.map((f)=> f(newTable))
     }
     return {
         get(key: string): T {
@@ -145,17 +126,58 @@ export async function makeReactiveTableService<T>(sync: (table?: Table<T>) => Pr
                 throw MISSING_KEY
             }
         },
-        set(key: string, val: T): Promise<void> {
+        async set(key: string, val: T): Promise<void> {
             let l = {..._table}
             l[key] = val
             l as Table<T>
-            return handleMutation(l)
-        },
-        delete(key: string): Promise<void> {
-            if (key in _table){
-                return handleMutation((Object.assign({}, ...Object.keys(_table).map((x) => x!=key?({[x]: _table[x]}):{}))) as Table<T>)
+            if (!optimistic){
+                try{
+                _table = await sync(l)
+                return handleMutation(_table)
+                }
+                catch{
+                    throw MISSING_KEY
+                }
             }
+            else{
+                handleMutation(l)
+                try{
+                     _table = await sync(l)
+                }
+                catch{
+                    handleMutation(_table)
+                    return Promise.reject("__EXPECTED_FAILURE__")
+                }
+            }
+        },
+        async delete(key: string): Promise<void> {
+            let l
+            if (key in _table){
+                l = (Object.assign({}, ...Object.keys(_table).map((x) => x!=key?({[x]: _table[x]}):{}))) as Table<T>
+            }
+            else{
             throw MISSING_KEY
+            }
+
+            if (!optimistic){
+                try{
+                _table = await sync(l)
+                return handleMutation(_table)
+                }
+                catch{
+                    throw MISSING_KEY
+                }
+            }
+            else{
+                handleMutation(l)
+                try{
+                     _table = await sync(l)
+                }
+                catch{
+                    handleMutation(_table)
+                    return Promise.reject("__EXPECTED_FAILURE__")
+                }
+            }
         },
 
         subscribe(observer: (table: Table<T>) => void): void {

@@ -11,9 +11,10 @@ import { isProcTExp, makeBoolTExp, makeNumTExp, makeProcTExp, makeStrTExp, makeV
          parseTE, unparseTExp, Record,
          BoolTExp, NumTExp, StrTExp, TExp, VoidTExp, UserDefinedTExp, isUserDefinedTExp, UDTExp, 
          isNumTExp, isBoolTExp, isStrTExp, isVoidTExp,
-         isRecord, ProcTExp, makeUserDefinedNameTExp, Field, makeAnyTExp, isAnyTExp, isUserDefinedNameTExp } from "./TExp";
+         isRecord, ProcTExp, makeUserDefinedNameTExp, Field, makeAnyTExp, isAnyTExp, isUserDefinedNameTExp, makeSymbolTExp , makePairTExp } from "./TExp";
 import { isEmpty, allT, first, rest, cons } from '../shared/list';
-import { Result, makeFailure, bind, makeOk, zipWithResult, mapv, mapResult, isFailure, either } from '../shared/result';
+import { Result, makeFailure, bind, makeOk, zipWithResult, mapv, mapResult, isFailure, either, safe2 } from '../shared/result';
+import { isCompoundSExp, isSymbolSExp } from './L5-value';
 
 // L51
 export const getTypeDefinitions = (p: Program): UserDefinedTExp[] => {
@@ -76,8 +77,9 @@ export const getTypeByName = (typeName: string, p: Program): Result<UDTExp> => {
 
 // TODO L51
 // Is te1 a subtype of te2?
-const isSubType = (te1: TExp, te2: TExp, p: Program): boolean =>
-    false;
+const isSubType = (te1: TExp, te2: TExp, p: Program): boolean =>{
+    return true
+}
 
 
 // TODO L51: Change this definition to account for user defined types
@@ -320,7 +322,7 @@ export const typeofLet = (exp: LetExp, tenv: TEnv, p: Program): Result<TExp> => 
     const vals = map((b) => b.val, exp.bindings);
     const varTEs = map((b) => b.var.texp, exp.bindings);
     const constraints = zipWithResult((varTE, val) => bind(typeofExp(val, tenv, p), (typeOfVal: TExp) => 
-                                                            checkEqualType(varTE, typeOfVal, exp, p)),
+                                                            checkEqualType(typeOfVal, varTE, exp, p)),
                                       varTEs, vals);
     return bind(constraints, _ => typeofExps(exp.body, makeExtendTEnv(vars, varTEs, tenv), p));
 };
@@ -382,11 +384,16 @@ export const typeofDefineType = (exp: DefineTypeExp, _tenv: TEnv, _p: Program): 
 
 // TODO L51
 export const typeofSet = (exp: SetExp, _tenv: TEnv, _p: Program): Result<TExp> =>
-    makeFailure(`Todo ${JSON.stringify(exp, null, 2)}`);
+{
+    const constraint =  safe2((valTE :TExp, varTE : TExp)=>checkEqualType(valTE, varTE, exp,_p))(typeofExp(exp.val, _tenv ,_p), applyTEnv(_tenv, exp.var.var));
+    return bind(constraint, ()=>makeOk(makeVoidTExp()));
+};
 
 // TODO L51
 export const typeofLit = (exp: LitExp, _tenv: TEnv, _p: Program): Result<TExp> =>
-    makeFailure(`Todo ${JSON.stringify(exp, null, 2)}`);
+    isSymbolSExp(exp.val) ? makeOk(makeSymbolTExp(exp.val)) :
+    isCompoundSExp(exp.val) ? makeOk(makePairTExp()):
+    makeFailure("wrong type of lit");
 
 // TODO: L51
 // Purpose: compute the type of a type-case
