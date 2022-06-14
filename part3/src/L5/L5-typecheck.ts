@@ -191,12 +191,27 @@ export const initTEnv = (p: Program): TEnv =>{
 // Verify that user defined types and type-case expressions are semantically correct
 // =================================================================================
 // TODO L51
+
+const checkeqRec = (rec1 : Record, rec2 : Record) : Boolean =>{
+    let fild1 = rec1.fields
+    let fild2 = rec2.fields
+    return fild1.reduce((acc : Boolean, f:Field) => {
+        return acc && (fild2.filter((x)=> x.fieldName == f.fieldName).length == 1)
+    },true)
+     
+}
 const checkUserDefinedTypes = (p: Program): Result<true> =>{
     let record = getRecords(p)
     for (let i = 0; i < record.length; i++) {
         let f = record.filter((x)=>x.typeName==record[i].typeName)
-        let k = f.filter((x)=>x.fields == record[i].fields)
-        
+        let k = f.filter((x)=>x.fields.length == record[i].fields.length)
+        if (f.length != k.length)
+            makeFailure("poop")
+        for (let j = 0; j < record[i].fields.length; j++) {
+            if (!checkeqRec(f[j],record[i])){
+                makeFailure("poop2")
+            }
+        }
     }
     return makeOk(true);
 }
