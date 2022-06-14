@@ -174,26 +174,54 @@ export const initTEnv = (p: Program): TEnv =>{
     let varTypeDef = TypeDef.map((v)=>v.typeName)
     let records = getRecords(p)
     let recvar = records.map((r)=>r.typeName)
-    console.log(TypeDef)
-    console.log("*******************************")
-    console.log(records)
-    return makeExtendTEnv((vardef.concat(varTypeDef,recvar)),(valTdef.concat(TypeDef,records)),makeEmptyTEnv())
+    let predRec = records.map((rec)=> rec.typeName+"?")
+    let makeRec = records.map((rec)=> "make-" + rec.typeName)
+    let makeRecType = records.map((rec)=> makeProcTExp(rec.fields.map((fild)=>fild.te) , rec))
+    let predRecType = records.map((rec)=> makeProcTExp([makeAnyTExp()], makeBoolTExp()))
+    let predUserDefType = TypeDef.map((def)=> makeProcTExp([makeAnyTExp()], makeBoolTExp()))
+    let predUserDef = TypeDef.map((def)=> def.typeName+"?")
+    
+    // console.log(TypeDef)
+    // console.log("*******************************")
+    // console.log(records)
+    return makeExtendTEnv((vardef.concat(varTypeDef,recvar,predRec,makeRec,predUserDef)),(valTdef.concat(TypeDef,records,predRecType,makeRecType,predUserDefType)),makeEmptyTEnv())
 }
 
 
 // Verify that user defined types and type-case expressions are semantically correct
 // =================================================================================
 // TODO L51
-const checkUserDefinedTypes = (p: Program): Result<true> =>
-    // If the same type name is defined twice with different definitions
-    // If a recursive type has no base case
-    makeOk(true);
+const checkUserDefinedTypes = (p: Program): Result<true> =>{
+    let record = getRecords(p)
+    for (let i = 0; i < record.length; i++) {
+        let f = record.filter((x)=>x.typeName==record[i].typeName)
+        let k = f.filter((x)=>x.fields == record[i].fields)
+        
+    }
+    return makeOk(true);
+}
 
 // TODO L51
-const checkTypeCase = (tc: TypeCaseExp, p: Program): Result<true> => 
-    // Check that all type case expressions have exactly one clause for each constituent subtype 
-    // (in any order)
-    makeOk(true);
+const checkTypeCase = (tc: TypeCaseExp, p: Program): Result<true> =>{
+    let cases = tc.cases
+    let a = getUserDefinedTypeByName(tc.typeName,p)
+    let records
+    if (isFailure(a))
+        return a
+    else
+        records = a.value.records
+    
+    for (let i = 0; i < cases.length; i++) {
+        let b = records.filter((x)=>x.typeName == cases[i].typeName)
+        if (b.length != 1){
+            return makeFailure("poop")
+        }
+        else if(b[0].fields.length != cases[i].varDecls.length){
+            return makeFailure("poop")
+        }  
+    }
+    return makeOk(true);
+}
 
 
 // Compute the type of L5 AST exps to TE
