@@ -203,17 +203,31 @@ const checkeqRec = (rec1 : Record, rec2 : Record) : Boolean =>{
 const checkUserDefinedTypes = (p: Program): Result<true> =>{
     let record = getRecords(p)
     for (let i = 0; i < record.length; i++) {
-        let f = record.filter((x)=>x.typeName==record[i].typeName)
-        let k = f.filter((x)=>x.fields.length == record[i].fields.length)
+        let myRec = record[i]
+        let f = record.filter((x)=>x.typeName == myRec.typeName)
+        let k = f.filter((x)=>x.fields.length == myRec.fields.length)
         if (f.length != k.length)
-            makeFailure("poop")
-        for (let j = 0; j < record[i].fields.length; j++) {
-            if (!checkeqRec(f[j],record[i])){
-                makeFailure("poop2")
+            return makeFailure("Failed")
+        for (let j = 0; j < myRec.fields.length; j++) {
+            if (!checkeqRec(f[j],myRec)){
+                return makeFailure("Failed")
             }
         }
     }
-    return makeOk(true);
+
+    let usersDefs:UserDefinedTExp[] = getTypeDefinitions(p)
+    let flag = usersDefs.reduce((acc:Boolean,userDef:UserDefinedTExp)=>{
+        return acc && userDef.records.reduce((acc2:Boolean,rec:Record)=>{
+            return acc2 || rec.fields.reduce((acc3:Boolean,field:Field)=>{
+                return acc3 || ((isUserDefinedTExp(field.te))?(field.te.typeName === userDef.typeName):true)
+            },false)
+        },false)
+    },true)
+
+    if (flag)
+        return makeOk(true);
+    else
+    return makeFailure("Failed")
 }
 
 // TODO L51
