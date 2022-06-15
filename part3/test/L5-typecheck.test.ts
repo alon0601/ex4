@@ -321,6 +321,7 @@ describe('L5 Type Checker', () => {
                 // console.log(`Parsed program ${JSON.stringify(p, null, 2)}`);
                 const t = typeofProgram(p, initTEnv(p), p);
                 // console.log(`Analyzed type ${JSON.stringify(t, null, 2)}`);
+                console.log(t)
                 expect(t).toSatisfy(isOkT(isTExp));
                 mapv(t, (t1: TExp) => {
                     expect(t1).toSatisfy(isNumTExp);

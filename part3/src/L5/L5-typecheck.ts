@@ -1,12 +1,12 @@
 // L5-typecheck
 // ========================================================
-import { equals, filter, flatten, includes, map, intersection, zipWith, reduce, is, replace } from 'ramda';
+import { equals, filter, flatten, includes, map, intersection, zipWith, reduce, is, replace, last } from 'ramda';
 import { isAppExp, isBoolExp, isDefineExp, isIfExp, isLetrecExp, isLetExp, isNumExp,
          isPrimOp, isProcExp, isProgram, isStrExp, isVarRef, unparse, parseL51,
          AppExp, BoolExp, DefineExp, Exp, IfExp, LetrecExp, LetExp, NumExp, SetExp, LitExp,
          Parsed, PrimOp, ProcExp, Program, StrExp, isSetExp, isLitExp, 
          isDefineTypeExp, isTypeCaseExp, DefineTypeExp, TypeCaseExp, CaseExp } from "./L5-ast";
-import { applyTEnv, makeEmptyTEnv, makeExtendTEnv, TEnv } from "./TEnv";
+import { applyTEnv, isExtendTEnv, makeEmptyTEnv, makeExtendTEnv, TEnv } from "./TEnv";
 import { isProcTExp, makeBoolTExp, makeNumTExp, makeProcTExp, makeStrTExp, makeVoidTExp,
          parseTE, unparseTExp, Record,
          BoolTExp, NumTExp, StrTExp, TExp, VoidTExp, UserDefinedTExp, isUserDefinedTExp, UDTExp, 
@@ -15,6 +15,7 @@ import { isProcTExp, makeBoolTExp, makeNumTExp, makeProcTExp, makeStrTExp, makeV
 import { isEmpty, allT, first, rest, cons } from '../shared/list';
 import { Result, makeFailure, bind, makeOk, zipWithResult, mapv, mapResult, isFailure, either, safe2, isOk } from '../shared/result';
 import { isCompoundSExp, isSymbolSExp } from './L5-value';
+import { Env } from './L5-env';
 
 // L51
 export const getTypeDefinitions = (p: Program): UserDefinedTExp[] => {
@@ -167,9 +168,22 @@ export const checkCoverType = (types: TExp[], p: Program): Result<TExp> => {
 // * Type of global variables (define expressions at top level of p)
 // * Type of implicitly defined procedures for user defined types (define-type expressions in p)
 export const initTEnv = (p: Program): TEnv =>{
-    let defins = getDefinitions(p) //no 
-    let vardef = defins.map((d)=>d.var.var)
-    let valTdef : TExp[] = (defins.map((d)=> typeofExp(d.val,makeEmptyTEnv(),p))).map((x)=> isOk(x) ? x.value: makeAnyTExp())
+    let env:TEnv = makeEmptyTEnv()
+    let defins = getDefinitions(p) //no
+
+    // let vardef = defins.map((d)=>d.var.var)
+    // let valTdef : TExp[] = (defins.map((d)=> typeofExp(d.val,makeExtendTEnv(),p))).map((x)=> isOk(x) ? x.value: makeAnyTExp())
+    let vardef:string[] = []
+    let valTdef:TExp[] = []
+    for (let i = 0; i < defins.length; i++) {
+        vardef.push(defins[i].var.var)
+        let a = typeofExp(defins[i].val,env,p)
+        if (isOk(a)){
+            valTdef.push(a.value)
+            env = makeExtendTEnv(vardef,valTdef,env)
+        }
+    }
+
     let TypeDef = getTypeDefinitions(p)
     let varTypeDef = TypeDef.map((v)=>v.typeName)
     let records = getRecords(p)
@@ -192,28 +206,30 @@ export const initTEnv = (p: Program): TEnv =>{
 // =================================================================================
 // TODO L51
 
-const checkeqRec = (rec1 : Record, rec2 : Record) : Boolean =>{
-    let fild1 = rec1.fields
-    let fild2 = rec2.fields
-    return fild1.reduce((acc : Boolean, f:Field) => {
-        return acc && (fild2.filter((x)=> x.fieldName == f.fieldName).length == 1)
-    },true)
+// const checkeqRec = (rec1 : Record, rec2 : Record) : Boolean =>{
+//     console.log(rec1)
+//     let fild1 = rec1.fields
+//     let fild2 = rec2.fields
+//     return fild1.reduce((acc : Boolean, f:Field) => {
+//         return acc && (fild2.filter((x)=> x.fieldName == f.fieldName).length == 1)
+//     },true)
      
-}
+// }
 const checkUserDefinedTypes = (p: Program): Result<true> =>{
-    let record = getRecords(p)
-    for (let i = 0; i < record.length; i++) {
-        let myRec = record[i]
-        let f = record.filter((x)=>x.typeName == myRec.typeName)
-        let k = f.filter((x)=>x.fields.length == myRec.fields.length)
-        if (f.length != k.length)
-            return makeFailure("Failed")
-        for (let j = 0; j < myRec.fields.length; j++) {
-            if (!checkeqRec(f[j],myRec)){
-                return makeFailure("Failed")
-            }
+    let records = getRecords(p)
+    records.reduce((acc:Boolean , rec:Record)=>{
+        let per = getRecordParents(rec.typeName,p)
+        if (per.length == 1)
+            return acc && true
+        else{
+            return acc && per.reduce((acc2:Boolean , p:UserDefinedTExp ) =>{
+                let prec = (p.records.filter((r)=>r.typeName === rec.typeName))
+                return acc2 && (prec.length === 1) && rec.fields.reduce((acc3:Boolean , fd:Field) => {
+                    return acc3 && (prec[0].fields.filter((f)=>f.fieldName == fd.fieldName).length == 1)
+                },true)
+            },true)
         }
-    }
+    },true)
 
     let usersDefs:UserDefinedTExp[] = getTypeDefinitions(p)
     let flag = usersDefs.reduce((acc:Boolean,userDef:UserDefinedTExp)=>{
@@ -460,8 +476,13 @@ export const typeofProgram = (exp: Program, tenv: TEnv, p: Program): Result<TExp
 
 // TODO L51
 // Write the typing rule for DefineType expressions
-export const typeofDefineType = (exp: DefineTypeExp, _tenv: TEnv, _p: Program): Result<TExp> =>
-    makeFailure(`Todo ${JSON.stringify(exp, null, 2)}`);
+// TODO L51
+// Write the typing rule for DefineType expressions
+export const typeofDefineType = (exp: DefineTypeExp, _tenv: TEnv, _p: Program): Result<TExp> =>{
+    const constraint = checkUserDefinedTypes(_p)
+    return bind(constraint,()=> makeOk(exp.udType))
+}
+    
 
 // TODO L51
 export const typeofSet = (exp: SetExp, _tenv: TEnv, _p: Program): Result<TExp> =>
@@ -487,6 +508,18 @@ export const typeofLit = (exp: LitExp, _tenv: TEnv, _p: Program): Result<TExp> =
 //   ( type-case id val (record_1 (field_11 ... field_1r1) body_1)...  )
 //  TODO
 export const typeofTypeCase = (exp: TypeCaseExp, tenv: TEnv, p: Program): Result<TExp> => {
-    let records = exp.cases.map((rec)=>[rec.typeName,])
-    
+    return bind(checkTypeCase(exp,p),()=>{
+        let casesType = exp.cases.map((cas)=>typeofExps(cas.body,tenv,p))
+        let teExp:TExp[] = []
+        for (let i = 0; i < casesType.length; i++) {
+            let a = casesType[i]
+            if (isOk(a)){
+                teExp.push(a.value)
+            }
+            else{
+                console.log(a)
+                return makeFailure("Failed - no case type")
+            }
+        }
+        return checkCoverType(teExp,p)})
 }
