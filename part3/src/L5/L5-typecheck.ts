@@ -173,16 +173,8 @@ export const initTEnv = (p: Program): TEnv =>{
 
     // let vardef = defins.map((d)=>d.var.var)
     // let valTdef : TExp[] = (defins.map((d)=> typeofExp(d.val,makeExtendTEnv(),p))).map((x)=> isOk(x) ? x.value: makeAnyTExp())
-    let vardef:string[] = []
-    let valTdef:TExp[] = []
-    for (let i = 0; i < defins.length; i++) {
-        vardef.push(defins[i].var.var)
-        let a = typeofExp(defins[i].val,env,p)
-        if (isOk(a)){
-            valTdef.push(a.value)
-            env = makeExtendTEnv(vardef,valTdef,env)
-        }
-    }
+    let vardef:string[] = defins.map((x)=>x.var.var)
+    let valTdef:TExp[] = defins.map((x)=>x.var.texp)
 
     let TypeDef = getTypeDefinitions(p)
     let varTypeDef = TypeDef.map((v)=>v.typeName)
