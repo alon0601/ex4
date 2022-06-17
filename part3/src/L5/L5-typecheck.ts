@@ -237,27 +237,64 @@ const checkUserDefinedTypes = (p: Program): Result<true> =>{
     else
     return makeFailure("Failed")
 }
+const checkAllGood = (udt:UserDefinedTExp,cases:CaseExp[]):Boolean =>{
+    let records = udt.records
+    for (let i = 0; i < cases.length; i++) {
+        let b = records.filter((x)=>x.typeName == cases[i].typeName)
+        if (b.length != 1){
+            return false
+        }
+        else if(b[0].fields.length != cases[i].varDecls.length){
+            return false
+        }  
+    }
+    return true
+}
 
 // TODO L51
 const checkTypeCase = (tc: TypeCaseExp, p: Program): Result<true> =>{
     let cases = tc.cases
-    let a = getUserDefinedTypeByName(tc.typeName,p)
-    let records
-    if (isFailure(a))
-        return a
-    else
-        records = a.value.records
-    
-    for (let i = 0; i < cases.length; i++) {
-        let b = records.filter((x)=>x.typeName == cases[i].typeName)
-        if (b.length != 1){
-            return makeFailure("poop")
+    let a = getTypeByName(tc.typeName,p)
+    return bind(a,(aVal)=>{
+            if (isUserDefinedTExp(aVal)){
+                if (checkAllGood(aVal,cases))
+                    return makeOk(true)
+                else
+                    return makeFailure("no good")
         }
-        else if(b[0].fields.length != cases[i].varDecls.length){
-            return makeFailure("poop")
-        }  
-    }
-    return makeOk(true);
+        else{
+            let recP = getRecordParents(aVal.typeName,p)
+            for (let i = 0; i < recP.length; i++) {
+                let parent = recP[i];
+                if (checkAllGood(parent,cases))
+                    return makeOk(true)
+            }
+            return makeFailure("no good")
+        }
+    })
+
+
+
+    // if(isFailure(a))
+    //     return makeFailure("not a valid tc")
+    // else if (isOk(a)){
+    //     if (isUserDefinedTExp(a.value)){
+    //         records = a.value.records
+    //     }
+    //     for (let i = 0; i < cases.length; i++) {
+    //         let b = records.filter((x)=>x.typeName == cases[i].typeName)
+    //         if (b.length != 1){
+    //             return makeFailure("poop")
+    //         }
+    //         else if(b[0].fields.length != cases[i].varDecls.length){
+    //             return makeFailure("poop")
+    //         }  
+    //     }
+    //     return makeOk(true);
+    // }
+    // else if(){
+
+    // }
 }
 
 
@@ -501,17 +538,31 @@ export const typeofLit = (exp: LitExp, _tenv: TEnv, _p: Program): Result<TExp> =
 //  TODO
 export const typeofTypeCase = (exp: TypeCaseExp, tenv: TEnv, p: Program): Result<TExp> => {
     return bind(checkTypeCase(exp,p),()=>{
-        let casesType = exp.cases.map((cas)=>typeofExps(cas.body,tenv,p))
-        let teExp:TExp[] = []
-        for (let i = 0; i < casesType.length; i++) {
-            let a = casesType[i]
-            if (isOk(a)){
-                teExp.push(a.value)
+        // let teExp:TExp[] = exp.cases.map((cas)=>{
+        //     let argsTyp = cas.varDecls.map((v)=>v.texp)
+        //     let argName = cas.varDecls.map((v)=>v.var)
+        //     let extTEnv = makeExtendTEnv(argName,argsTyp,tenv)
+        //     let casesType = typeofExps(cas.body,extTEnv,p)
+        //     if (isOk(casesType)){
+        //         return casesType.value
+        //     }
+        //     else
+        //         return  makeFailure("fuck")
+        // })
+        let teExp:TExp[] =[]
+        for (let j = 0; j < exp.cases.length; j++) {
+            let cas = exp.cases[j]
+            let rec = getRecordByName(cas.typeName,p)
+            let argsTyp = bind(rec,(r)=> makeOk(r.fields.map((f)=>f.te)))
+            // let argsTyp = cas.varDecls.map((v)=>v.texp)
+            let argName = cas.varDecls.map((v)=>v.var)
+            let extTEnv = bind(argsTyp,(argstyp)=> makeOk(makeExtendTEnv(argName,argstyp,tenv)))
+            let casesType = bind(extTEnv,(extt)=> typeofExps(cas.body,extt,p))
+            if (isOk(casesType)){
+                teExp.push(casesType.value)
             }
-            else{
-                console.log(a)
-                return makeFailure("Failed - no case type")
-            }
+            else
+                return  makeFailure("fuck")
         }
         return checkCoverType(teExp,p)})
 }
